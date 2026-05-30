@@ -63,27 +63,40 @@ router.post('/generate/leave', async (req, res) => {
 
 // POST /interactions
 router.post('/interactions', async (req, res) => {
+  console.log('[interactions] Incoming request, headers:', JSON.stringify(req.headers))
+
   const signature = req.headers['x-signature-ed25519']
   const timestamp = req.headers['x-signature-timestamp']
+
+  console.log('[interactions] Verifying signature...')
   const isValid = verifyKey(req.body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY)
   if (!isValid) {
+    console.warn('[interactions] Invalid signature, rejecting request')
     return res.status(401).end('Invalid request signature')
   }
+  console.log('[interactions] Signature valid')
 
   const interaction = JSON.parse(req.body.toString())
+  console.log('[interactions] Received interaction type:', interaction.type)
 
   // PING
   if (interaction.type === 1) {
+    console.log('[interactions] PING received, sending PONG')
     res.setHeader('Content-Type', 'application/json')
-    return res.status(200).json({ type: 1 })
+    console.log('[interactions] Content-Type header set to application/json')
+    const pong = { type: 1 }
+    console.log('[interactions] Sending PONG response:', JSON.stringify(pong))
+    return res.status(200).json(pong)
   }
 
   // APPLICATION_COMMAND
   if (interaction.type === 2) {
     const commandName = interaction.data?.name
-    const command = commands.get(commandName)
+    console.log(`[interactions] APPLICATION_COMMAND received: "${commandName}"`)
 
+    const command = commands.get(commandName)
     if (!command) {
+      console.warn(`[interactions] Unknown command: "${commandName}"`)
       res.setHeader('Content-Type', 'application/json')
       return res.json({
         type: 4,
@@ -91,22 +104,28 @@ router.post('/interactions', async (req, res) => {
       })
     }
 
+    console.log(`[interactions] Executing command: "${commandName}"`)
     try {
       await command.execute(interaction, res)
+      console.log(`[interactions] Command "${commandName}" completed`)
     } catch (err) {
       console.error(`[router] Command "${commandName}" threw:`, err.message)
       if (!res.headersSent) {
+        console.log(`[interactions] Sending error fallback response for "${commandName}"`)
         res.setHeader('Content-Type', 'application/json')
         res.json({
           type: 4,
           data: { content: 'An error occurred while running that command.', flags: 64 },
         })
+      } else {
+        console.warn(`[interactions] Headers already sent, skipping error response for "${commandName}"`)
       }
     }
     return
   }
 
   // Unhandled interaction type
+  console.warn('[interactions] Unhandled interaction type:', interaction.type)
   res.setHeader('Content-Type', 'application/json')
   res.json({ type: 4, data: { content: 'Unsupported interaction type.', flags: 64 } })
 })
