@@ -65,28 +65,17 @@ router.post('/generate/leave', async (req, res) => {
 router.post('/interactions', async (req, res) => {
   const signature = req.headers['x-signature-ed25519']
   const timestamp = req.headers['x-signature-timestamp']
-
-  // Log before verification — req.body is a raw Buffer here
-  console.log('[interactions] Received interaction type:', req.body ? JSON.parse(req.body.toString())?.type : 'unknown')
-
-  const isValid = verifyKey(
-    req.body,
-    signature,
-    timestamp,
-    process.env.DISCORD_PUBLIC_KEY
-  )
+  const isValid = verifyKey(req.body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY)
   if (!isValid) {
-    console.warn('[interactions] Invalid signature')
-    return res.status(401).send('Invalid signature')
+    return res.status(401).end('Invalid request signature')
   }
 
-  // Safe to parse now that signature is verified
   const interaction = JSON.parse(req.body.toString())
 
   // PING
   if (interaction.type === 1) {
-    console.log('[interactions] PING received, sending PONG')
-    return res.json({ type: 1 })
+    res.setHeader('Content-Type', 'application/json')
+    return res.status(200).json({ type: 1 })
   }
 
   // APPLICATION_COMMAND
@@ -95,6 +84,7 @@ router.post('/interactions', async (req, res) => {
     const command = commands.get(commandName)
 
     if (!command) {
+      res.setHeader('Content-Type', 'application/json')
       return res.json({
         type: 4,
         data: { content: 'Unknown command.', flags: 64 },
@@ -106,6 +96,7 @@ router.post('/interactions', async (req, res) => {
     } catch (err) {
       console.error(`[router] Command "${commandName}" threw:`, err.message)
       if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json')
         res.json({
           type: 4,
           data: { content: 'An error occurred while running that command.', flags: 64 },
@@ -116,6 +107,7 @@ router.post('/interactions', async (req, res) => {
   }
 
   // Unhandled interaction type
+  res.setHeader('Content-Type', 'application/json')
   res.json({ type: 4, data: { content: 'Unsupported interaction type.', flags: 64 } })
 })
 
