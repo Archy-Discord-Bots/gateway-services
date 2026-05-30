@@ -8,7 +8,6 @@ const REQUIRED_ENV = [
   'HF_BUCKET_NAME',
   'API_SECRET',
 ]
-
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
     console.error(`[startup] Missing required environment variable: ${key}`)
@@ -18,14 +17,20 @@ for (const key of REQUIRED_ENV) {
 
 const app = express()
 
-// Raw body for /interactions — must come first, before any JSON middleware.
-// type: '*/*' captures whatever Content-Type Discord sends.
-app.use('/interactions', express.raw({ type: '*/*' }))
-
-// JSON body for every other route — skip /interactions so the raw Buffer is preserved.
+// Custom middleware — must come before the router.
+// Every request gets req.rawBody as the original string.
+// Non-/interactions routes also get req.body as parsed JSON.
 app.use((req, res, next) => {
-  if (req.path === '/interactions') return next()
-  express.json()(req, res, next)
+  let data = ''
+  req.setEncoding('utf8')
+  req.on('data', (chunk) => { data += chunk })
+  req.on('end', () => {
+    req.rawBody = data
+    if (req.path !== '/interactions') {
+      try { req.body = JSON.parse(data) } catch { req.body = {} }
+    }
+    next()
+  })
 })
 
 app.use('/', router)
