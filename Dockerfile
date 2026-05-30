@@ -5,7 +5,10 @@ RUN apk add --no-cache \
   ttf-dejavu \
   freetype \
   freetype-dev \
-  fribidi
+  fribidi \
+  python3 \
+  make \
+  g++
 
 WORKDIR /app
 
