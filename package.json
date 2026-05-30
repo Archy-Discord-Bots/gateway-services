@@ -9,12 +9,10 @@
     "start": "node src/index.js"
   },
   "dependencies": {
-    "bufferutil": "latest",
     "discord-interactions": "latest",
     "discord.js": "latest",
     "express": "latest",
     "skia-canvas": "latest",
-    "zlib-sync": "latest",
     "@huggingface/hub": "latest"
   }
 }
