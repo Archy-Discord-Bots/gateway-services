@@ -18,16 +18,19 @@ for (const key of REQUIRED_ENV) {
 
 const app = express()
 
-// Raw body only for /interactions — needed for Ed25519 signature verification
-app.use('/interactions', express.raw({ type: 'application/json' }))
+// Raw body for /interactions — must come first, before any JSON middleware.
+// type: '*/*' captures whatever Content-Type Discord sends.
+app.use('/interactions', express.raw({ type: '*/*' }))
 
-// JSON body for all other routes
-app.use(express.json())
+// JSON body for every other route — skip /interactions so the raw Buffer is preserved.
+app.use((req, res, next) => {
+  if (req.path === '/interactions') return next()
+  express.json()(req, res, next)
+})
 
 app.use('/', router)
 
 const PORT = process.env.PORT || 7860
-
 app.listen(PORT, () => {
   console.log(`[startup] gateway-services running on port ${PORT} — ${new Date().toISOString()}`)
 })
