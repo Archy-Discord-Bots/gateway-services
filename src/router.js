@@ -2,7 +2,6 @@ import { Router } from 'express'
 import { verifyKey } from 'discord-interactions'
 import { generateWelcomeCard } from './canvas/welcomeCard.js'
 import { generateLeaveCard } from './canvas/leaveCard.js'
-
 import * as setupCmd from './commands/setup.js'
 import * as welcomeMessageCmd from './commands/welcome-message.js'
 import * as leaveMessageCmd from './commands/leave-message.js'
@@ -37,7 +36,6 @@ router.post('/generate/welcome', async (req, res) => {
   if (req.headers['x-api-secret'] !== process.env.API_SECRET) {
     return res.status(401).json({ error: 'unauthorized' })
   }
-
   try {
     const buffer = await generateWelcomeCard(req.body)
     res.set('Content-Type', 'image/png')
@@ -53,7 +51,6 @@ router.post('/generate/leave', async (req, res) => {
   if (req.headers['x-api-secret'] !== process.env.API_SECRET) {
     return res.status(401).json({ error: 'unauthorized' })
   }
-
   try {
     const buffer = await generateLeaveCard(req.body)
     res.set('Content-Type', 'image/png')
@@ -69,15 +66,26 @@ router.post('/interactions', async (req, res) => {
   const signature = req.headers['x-signature-ed25519']
   const timestamp = req.headers['x-signature-timestamp']
 
-  const isValid = verifyKey(req.body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY)
+  // Log before verification — req.body is a raw Buffer here
+  console.log('[interactions] Received interaction type:', req.body ? JSON.parse(req.body.toString())?.type : 'unknown')
+
+  const isValid = verifyKey(
+    req.body,
+    signature,
+    timestamp,
+    process.env.DISCORD_PUBLIC_KEY
+  )
   if (!isValid) {
-    return res.status(401).end('Invalid request signature')
+    console.warn('[interactions] Invalid signature')
+    return res.status(401).send('Invalid signature')
   }
 
+  // Safe to parse now that signature is verified
   const interaction = JSON.parse(req.body.toString())
 
   // PING
   if (interaction.type === 1) {
+    console.log('[interactions] PING received, sending PONG')
     return res.json({ type: 1 })
   }
 
@@ -97,7 +105,6 @@ router.post('/interactions', async (req, res) => {
       await command.execute(interaction, res)
     } catch (err) {
       console.error(`[router] Command "${commandName}" threw:`, err.message)
-      // Only send error response if headers haven't been sent yet
       if (!res.headersSent) {
         res.json({
           type: 4,
