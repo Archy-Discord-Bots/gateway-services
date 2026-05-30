@@ -67,14 +67,18 @@ router.post('/interactions', async (req, res) => {
   const timestamp = req.headers['x-signature-timestamp']
 
   console.log('[interactions] Verifying signature...')
-  const isValid = verifyKey(req.body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY)
+  const isValid = verifyKey(
+    req.rawBody,
+    signature,
+    timestamp,
+    process.env.DISCORD_PUBLIC_KEY
+  )
   if (!isValid) {
-    console.warn('[interactions] Invalid signature, rejecting request')
-    return res.status(401).end('Invalid request signature')
+    console.warn('[interactions] Invalid signature')
+    return res.status(401).end('Bad request signature')
   }
 
-  // Parse immediately so PING can be handled before anything else
-  const interaction = JSON.parse(req.body.toString())
+  const interaction = JSON.parse(req.rawBody)
 
   // PING — respond as fast as possible, no logging before this
   if (interaction.type === 1) {
